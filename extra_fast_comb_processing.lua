@@ -8,53 +8,15 @@ local function getCentrifugePeripherals()
     return centrifugeList
 end
 
-local function distributeItemsTask(inputInventory, centrifuge, slot)
-    local itemDetail = inputInventory.getItemDetail(slot)
-    if itemDetail then
-        inputInventory.pushItems(centrifuge.name, slot)
-    end
-end
-
 local function distributeItems(inputInventory, centrifuges)
-    local centrifugeCount = #centrifuges
-    local currentSlot = 1
     while true do
         local tasks = {}
         for _, centrifuge in ipairs(centrifuges) do
             table.insert(tasks, function()
-                distributeItemsTask(inputInventory, centrifuge, currentSlot)
+                inputInventory.pushItems(centrifuge.name, 1)
             end)
         end
-
         parallel.waitForAll(table.unpack(tasks))
-        currentSlot = (currentSlot % 36) + 1
-    end
-end
-
-local function dumpItemsTask(centrifuge, output)
-    local items = centrifuge.obj.list()
-    for slot, _ in pairs(items) do
-        centrifuge.obj.pushItems(output.name, slot)
-    end
-end
-
-local function dumpItems(centrifuges, output)
-    while true do
-        local tasks = {}
-        for _, centrifuge in ipairs(centrifuges) do
-            table.insert(tasks, function()
-                dumpItemsTask(centrifuge, output)
-            end)
-        end
-
-        parallel.waitForAll(table.unpack(tasks))
-    end
-end
-
-local function dumpFluidsTask(centrifuge, output)
-    local tanks = centrifuge.obj.tanks()
-    if tanks and #tanks > 0 then
-        centrifuge.obj.pushFluid(output.name)
     end
 end
 
@@ -63,21 +25,42 @@ local function dumpFluids(centrifuges, output)
         local tasks = {}
         for _, centrifuge in ipairs(centrifuges) do
             table.insert(tasks, function()
-                dumpFluidsTask(centrifuge, output)
+                centrifuge.obj.pushFluid(output.name)
             end)
         end
         parallel.waitForAll(table.unpack(tasks))
     end
 end
 
+local function dumpItems(centrifuges, output, limit)
+    while true do
+        for runs = 1, math.ceil((#centrifuges * 9) / limit) do
+            local tasks = {}
+            for i = 1, limit do
+                table.insert(tasks, function()
+                    centrifuges[((((runs - 1) * limit + i) - 1) % #centrifuges) + 1].obj.pushItems(output.name, math.ceil(((((runs - 1) * limit + i) - 1) / #centrifuges) + 1) % 10 + 1)
+                end)
+            end
+            parallel.waitForAll(table.unpack(tasks))
+        end
+    end
+end
+
+
 local function main()
     local centrifuges = getCentrifugePeripherals()
-    local input = peripheral.wrap("expatternprovider:oversize_interface_0")
+    local input = peripheral.wrap("functionalstorage:storage_controller_0")
     local output = {name = "expatternprovider:oversize_interface_1", obj = peripheral.wrap("expatternprovider:oversize_interface_1")}
+    local processLimit = math.ceil(255 - 255/10)
+    local distributeProc = #centrifuges
+    processLimit = processLimit - distributeProc
+    local dumpFluidsProc = #centrifuges
+    processLimit = processLimit - dumpFluidsProc
+    local dumpItemsLimit = processLimit
     parallel.waitForAll(
         function() distributeItems(input, centrifuges) end,
-        function() dumpItems(centrifuges, output) end,
-        function() dumpFluids(centrifuges, output) end
+        function() dumpFluids(centrifuges, output) end,
+        function() dumpItems(centrifuges, output, dumpItemsLimit) end
     )
 end
 
