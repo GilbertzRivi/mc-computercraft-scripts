@@ -9,14 +9,18 @@ local function getCentrifugePeripherals()
 end
 
 local function distributeItems(inputInventory, centrifuges)
+    inputSlot = 1
     while true do
-        local tasks = {}
-        for _, centrifuge in ipairs(centrifuges) do
-            table.insert(tasks, function()
-                inputInventory.pushItems(centrifuge.name, 1)
-            end)
+        while inputInventory.getItemDetail(inputSlot) ~= nil do
+            local tasks = {}
+            for _, centrifuge in ipairs(centrifuges) do
+                table.insert(tasks, function()
+                    inputInventory.pushItems(centrifuge.name, inputSlot)
+                end)
+            end
+            parallel.waitForAll(table.unpack(tasks))
         end
-        parallel.waitForAll(table.unpack(tasks))
+        inputSlot = (inputSlot + 1) % inputInventory.size() + 1
     end
 end
 
@@ -38,7 +42,8 @@ local function dumpItems(centrifuges, output, limit)
             local tasks = {}
             for i = 1, limit do
                 table.insert(tasks, function()
-                    centrifuges[((((runs - 1) * limit + i) - 1) % #centrifuges) + 1].obj.pushItems(output.name, math.ceil(((((runs - 1) * limit + i) - 1) / #centrifuges) + 1) % 10 + 1)
+                    j = ((runs - 1) * limit + i)
+                    centrifuges[((j - 1) % #centrifuges) + 1].obj.pushItems(output.name, math.ceil(((j - 1) / #centrifuges) + 1) % 11 + 1)
                 end)
             end
             parallel.waitForAll(table.unpack(tasks))
@@ -48,9 +53,11 @@ end
 
 
 local function main()
+    local inputName = "functionalstorage:storage_controller_0"
+    local outputName = "expatternprovider:oversize_interface_1"
     local centrifuges = getCentrifugePeripherals()
-    local input = peripheral.wrap("functionalstorage:storage_controller_0")
-    local output = {name = "expatternprovider:oversize_interface_1", obj = peripheral.wrap("expatternprovider:oversize_interface_1")}
+    local input = peripheral.wrap(inputName)
+    local output = {name = outputName, obj = peripheral.wrap(outputName)}
     local processLimit = math.ceil(255 - 255/10)
     local distributeProc = #centrifuges
     processLimit = processLimit - distributeProc
