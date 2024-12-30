@@ -8,10 +8,11 @@ local function getCentrifugePeripherals()
     return centrifugeList
 end
 
-local function distributeItems(inputInventory, centrifuges)
+local function distributeItems(inputInventory, centrifuges, limitForASlot)
     inputSlot = 1
+    foo = 1
     while true do
-        while inputInventory.getItemDetail(inputSlot) ~= nil do
+        while inputInventory.getItemDetail(inputSlot) ~= nil and foo <= limitForASlot do
             local tasks = {}
             for _, centrifuge in ipairs(centrifuges) do
                 table.insert(tasks, function()
@@ -19,6 +20,7 @@ local function distributeItems(inputInventory, centrifuges)
                 end)
             end
             parallel.waitForAll(table.unpack(tasks))
+            foo = foo + 1
         end
         inputSlot = (inputSlot + 1) % inputInventory.size() + 1
     end
@@ -55,6 +57,7 @@ end
 local function main()
     local inputName = "functionalstorage:storage_controller_0"
     local outputName = "expatternprovider:oversize_interface_1"
+    local limitForASlot = 256;
     local centrifuges = getCentrifugePeripherals()
     local input = peripheral.wrap(inputName)
     local output = {name = outputName, obj = peripheral.wrap(outputName)}
@@ -65,7 +68,7 @@ local function main()
     processLimit = processLimit - dumpFluidsProc
     local dumpItemsLimit = processLimit
     parallel.waitForAll(
-        function() distributeItems(input, centrifuges) end,
+        function() distributeItems(input, centrifuges, limitForASlot) end,
         function() dumpFluids(centrifuges, output) end,
         function() dumpItems(centrifuges, output, dumpItemsLimit) end
     )
